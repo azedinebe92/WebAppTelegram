@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "../OneDrive/Bureau/Edu-Check/EduCheck/src/main/java/fr/esic/api"
+		},
+		{
+			"path": "../OneDrive/Bureau/Edu-Check/EduCheck/src/main/java/fr/esic/entities"
+		},
+		{
+			"path": "../OneDrive/Bureau/Edu-Check/EduCheck/src/main/java/fr/esic/repository"
+		},
+		{
+			"path": "../OneDrive/Bureau/Edu-Check/EduCheck/src/main/java/fr/esic/security"
+		},
+		{
+			"path": "../OneDrive/Bureau/Edu-Check/EduCheck/src/main/java/fr/esic/services"
+		}
+	]
+}
