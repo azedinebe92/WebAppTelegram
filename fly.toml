@@ -11,10 +11,11 @@ primary_region = 'cdg'
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = 'off'   # ← NE PLUS arrêter automatiquement
+  auto_stop_machines = "off"   # ⬅️ au lieu de "stop"
   auto_start_machines = true
-  min_machines_running = 1     # ← garder 1 VM en marche
-  processes = ['app']
+  min_machines_running = 1     # ⬅️ garder 1 machine en route
+  processes = ["app"]
+
 
 [[vm]]
   memory = '1gb'

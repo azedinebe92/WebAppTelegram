@@ -20,5 +20,5 @@ ENV PORT=8080 \
 
 EXPOSE 8080
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "-s", "--"]
 CMD ["python", "bot.py"]

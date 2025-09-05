@@ -4,8 +4,12 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from telegram.error import BadRequest
 from telegram.error import TelegramError
+from telegram import WebAppInfo, KeyboardButton, ReplyKeyboardMarkup
+from telegram.ext import MessageFilter
 
 
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, InputMediaPhoto
@@ -15,12 +19,37 @@ from telegram.ext import (
     Filters, CallbackContext, ConversationHandler
 )
 
+
+
+
+class HasWebAppData(MessageFilter):
+    def filter(self, message):
+        return bool(getattr(message, "web_app_data", None))
+
+has_webapp_data = HasWebAppData()
+
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ok")
+
+def start_health_server():
+    port = int(os.getenv("PORT", "8080"))
+    httpd = HTTPServer(("0.0.0.0", port), HealthHandler)
+    t = threading.Thread(target=httpd.serve_forever, daemon=True)
+    t.start()
+
+
 # --------------------
 # Config / Chargement
 # --------------------
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")  # Optionnel: pour notification admin
+WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()  # mets cette URL en secret Fly plus tard
+
 
 PRODUCTS_PATH = "products.json"
 ORDERS_PATH = "orders.json"
@@ -99,12 +128,26 @@ def back_menu_kb():
 # --------------------
 # Commandes de base
 # --------------------
+#def start(update: Update, context: CallbackContext):
+#    update.message.reply_text(
+#        "👋 Bienvenue dans ma boutique Telegram !\n\n"
+#        "Utilisez les boutons ci-dessous pour commencer.",
+#        reply_markup=main_menu_kb()
+#    )
+
 def start(update: Update, context: CallbackContext):
+    buttons = []
+    if WEBAPP_URL:
+        buttons.append([KeyboardButton("🧾 Ouvrir la boutique", web_app=WebAppInfo(url=WEBAPP_URL))])
+    reply_kb = ReplyKeyboardMarkup(buttons, resize_keyboard=True) if buttons else None
+
     update.message.reply_text(
         "👋 Bienvenue dans ma boutique Telegram !\n\n"
-        "Utilisez les boutons ci-dessous pour commencer.",
-        reply_markup=main_menu_kb()
+        "• 🛍️ Utilise les boutons ci-dessous\n"
+        "• ou /shop pour la version bot",
+        reply_markup=reply_kb or main_menu_kb()
     )
+
 
 def help_cmd(update: Update, context: CallbackContext):
     update.message.reply_text(
@@ -463,14 +506,16 @@ def confirm_or_cancel(update: Update, context: CallbackContext):
         # Notifier admin si configuré
         if ADMIN_CHAT_ID:
             try:
+                items = ", ".join(f"{i['name']} x{i['qty']}" for i in order.get("cart", []))
                 text_admin = (
                     "📦 *Nouvelle commande*\n"
                     f"Client: {order.get('customer_name')} ({order.get('username')})\n"
                     f"Adresse: {order.get('address')}\n"
                     f"Téléphone: {order.get('phone')}\n"
                     f"Total: {order.get('total_formatted')}\n"
-                    f"Articles: " + ", ".join(f"{i['name']} x{i['qty']}" for i in order["cart"])
+                    f"Articles: {items}"
                 )
+
                 query.bot.send_message(chat_id=int(ADMIN_CHAT_ID), text=text_admin, parse_mode=ParseMode.MARKDOWN)
             except Exception:
                 pass
@@ -482,6 +527,57 @@ def confirm_or_cancel(update: Update, context: CallbackContext):
         )
         return ConversationHandler.END
     
+
+def handle_webapp_data(update: Update, context: CallbackContext):
+    if not update.message or not update.message.web_app_data:
+        return
+    try:
+        data_raw = update.message.web_app_data.data  # string JSON
+        order_in = json.loads(data_raw)
+        if order_in.get("kind") != "order":
+            update.message.reply_text("Type de donnée non supporté.")
+            return
+
+        # Construire la commande côté serveur (sécurité / formatage)
+        cart = order_in.get("cart", [])
+        total = sum(float(i["price"]) * int(i["qty"]) for i in cart)
+        order = {
+            "customer_name": order_in.get("customer_name"),
+            "address": order_in.get("address"),
+            "phone": order_in.get("phone"),
+            "cart": cart,
+            "total": round(total, 2),
+            "total_formatted": format_price(total),
+            "user_id": update.effective_user.id,
+            "username": f"@{update.effective_user.username}" if update.effective_user.username else None,
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "source": "webapp"
+        }
+        save_order(order)
+
+        # Notif admin éventuelle
+        if ADMIN_CHAT_ID:
+            try:
+                items = ", ".join(f"{i['name']} x{i['qty']}" for i in order.get("cart", []))
+                text_admin = (
+                    "📦 *Nouvelle commande (WebApp)*\n"
+                    f"Client: {order.get('customer_name')} ({order.get('username')})\n"
+                    f"Adresse: {order.get('address')}\n"
+                    f"Téléphone: {order.get('phone')})\n"
+                    f"Total: {order.get('total_formatted')}\n"
+                    f"Articles: {items}"
+                )
+
+                context.bot.send_message(chat_id=int(ADMIN_CHAT_ID), text=text_admin, parse_mode=ParseMode.MARKDOWN)
+            except Exception:
+                pass
+
+        update.message.reply_text("✅ Merci ! Votre commande (WebApp) a été enregistrée.")
+    except Exception as e:
+        print(f"[WebAppData error] {e}")
+        update.message.reply_text("❌ Erreur lors du traitement de la commande.")
+
+
 
 def error_handler(update, context):
     try:
@@ -507,8 +603,10 @@ def main():
     dp.add_handler(CommandHandler("help", help_cmd))
     dp.add_handler(CommandHandler("shop", shop_cmd))
     dp.add_handler(CommandHandler("cart", cart_cmd))
-
+    
+    dp.add_handler(MessageHandler(has_webapp_data, handle_webapp_data))
     dp.add_handler(CallbackQueryHandler(add_to_cart_cb, pattern=r"^add_\w+$"))
+
 
     conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_checkout_cb, pattern=r"^checkout$")],
@@ -548,7 +646,10 @@ def main():
             print("⚠️ WEBHOOK_URL manquant.")
         updater.idle()
     else:
-        # ✅ IMPORTANT pour le polling : enlever tout webhook résiduel
+        # ➜ démarrer un petit serveur HTTP pour Fly (healthcheck)
+        start_health_server()
+
+        # S'assurer qu'aucun webhook n'est actif
         try:
             updater.bot.delete_webhook()
         except Exception:
@@ -557,6 +658,7 @@ def main():
         updater.start_polling()
         print("🤖 Bot démarré en polling.")
         updater.idle()
+
 
 
 
