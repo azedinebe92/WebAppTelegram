@@ -6,42 +6,49 @@
   <title>Boutique Telegram</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root { --pad: 14px; --radius: 14px; }
-    body {
-      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      background: #0f0f10; color: #fff;
-    }
-    .wrap { padding: var(--pad); max-width: 900px; margin: 0 auto; }
-    h1 { font-size: 20px; margin: 0 0 10px; }
-    .grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
-      gap: var(--pad);
-    }
-    .card {
-      background: #18181a; border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column;
-      box-shadow: 0 0 0 1px #26262a inset;
-    }
-    .card img { width: 100%; aspect-ratio: 3/2; object-fit: cover; }
-    .card .body { padding: var(--pad); display: flex; flex-direction: column; gap: 8px; }
-    .name { font-weight: 600; }
-    .price { opacity: .9; }
-    .desc { opacity: .8; font-size: 14px; line-height: 1.35; }
-    .row { display: flex; gap: 8px; align-items: center; }
-    button, .btn {
-      background: #2b2b30; color: #fff; border: 0; padding: 10px 12px; border-radius: 10px; cursor: pointer;
-    }
-    .cta { background: #4caf50; }
-    .bar {
-      position: sticky; bottom: 0; left:0; right:0; padding: var(--pad);
-      background: #121214cc; backdrop-filter: blur(6px);
-      display: flex; gap: 8px; align-items: center; justify-content: space-between;
-      border-top: 1px solid #26262a;
-    }
-    input, textarea {
-      width: 100%; background: #1b1b1f; color: #fff; border: 1px solid #2a2a2f; border-radius: 10px; padding: 10px;
-    }
-    form { display: grid; gap: 10px; margin-top: 8px; }
-    .muted { opacity: .7; font-size: 13px; }
+    :root { --pad:14px; --radius:14px; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0f0f10; color:#fff; }
+    .wrap { padding: var(--pad); max-width:1000px; margin:0 auto; }
+    h1 { font-size:20px; margin:0 0 8px; }
+    .muted { opacity:.7; font-size:13px; }
+
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:var(--pad); margin-top:10px; }
+    .card { background:#18181a; border-radius:var(--radius); overflow:hidden; display:flex; flex-direction:column; box-shadow:0 0 0 1px #26262a inset; }
+    .card img { width:100%; aspect-ratio:3/2; object-fit:cover; }
+    .body { padding:var(--pad); display:flex; flex-direction:column; gap:8px; }
+    .name { font-weight:600; }
+    .price { opacity:.9; }
+    .desc { opacity:.8; font-size:14px; line-height:1.35; }
+    button { background:#2b2b30; color:#fff; border:0; padding:10px 12px; border-radius:10px; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .row { display:flex; gap:8px; align-items:center; }
+
+    /* bar bas */
+    .bar { position:sticky; bottom:0; left:0; right:0; padding:var(--pad); background:#121214cc; backdrop-filter: blur(6px);
+      display:flex; gap:8px; align-items:center; justify-content:space-between; border-top:1px solid #26262a; }
+    .cta { background:#4caf50; }
+
+    /* tiroir panier */
+    .drawer { position:fixed; inset:auto 0 0 0; transform: translateY(100%); transition: transform .25s ease; background:#141416; border-top-left-radius:18px; border-top-right-radius:18px; box-shadow:0 -10px 30px rgba(0,0,0,.4); }
+    .drawer.open { transform: translateY(0); }
+    .drawer .head { display:flex; align-items:center; justify-content:space-between; padding:14px; border-bottom:1px solid #26262a; }
+    .drawer .items { max-height:45vh; overflow:auto; padding:8px 14px; display:flex; flex-direction:column; gap:10px; }
+    .cart-item { display:grid; grid-template-columns:64px 1fr auto; gap:10px; background:#1a1a1f; border:1px solid #2a2a2f; border-radius:12px; padding:8px; }
+    .cart-item img { width:64px; height:64px; object-fit:cover; border-radius:8px; }
+    .cart-item .t { font-weight:600; }
+    .cart-item .p { font-size:13px; opacity:.8; }
+    .qty { display:flex; align-items:center; gap:6px; }
+    .qty button { width:32px; height:32px; border-radius:8px; }
+    .del { background:#3a2a2a; }
+    .footer { padding:12px 14px; border-top:1px solid #26262a; display:grid; gap:8px; }
+    .summary-line { display:flex; justify-content:space-between; }
+    .actions { display:flex; gap:8px; }
+    .danger { background:#c84c4c; }
+
+    /* formulaire */
+    form { display:grid; gap:10px; margin-top:16px; }
+    input, textarea { width:100%; background:#1b1b1f; color:#fff; border:1px solid #2a2a2f; border-radius:10px; padding:10px; }
   </style>
 </head>
 <body>
@@ -59,38 +66,97 @@
     </form>
   </div>
 
+  <!-- Barre bas -->
   <div class="bar">
     <div id="summary">🧺 Panier (0) — 0,00 €</div>
-    <button id="pay" class="cta">Envoyer la commande</button>
+    <div class="row">
+      <button id="openCart">Voir panier</button>
+      <button id="pay" class="cta">Envoyer la commande</button>
+    </div>
+  </div>
+
+  <!-- Tiroir Panier -->
+  <div id="drawer" class="drawer" aria-hidden="true">
+    <div class="head">
+      <div style="font-weight:600;">🧺 Votre panier</div>
+      <button id="closeCart">Fermer</button>
+    </div>
+    <div id="cartItems" class="items"></div>
+    <div class="footer">
+      <div class="summary-line"><span>Articles</span><strong id="sumItems">0</strong></div>
+      <div class="summary-line"><span>Total</span><strong id="sumTotal">0,00 €</strong></div>
+      <div class="actions">
+        <button id="clearCart" class="danger">Vider</button>
+        <button id="goCheckout" class="cta" style="flex:1;">Valider dans Telegram</button>
+      </div>
+    </div>
   </div>
 
 <script>
-const tg = window.Telegram?.WebApp;
-tg?.expand(); // agrandir la WebApp
+const tg = window.Telegram?.WebApp; tg?.expand();
+const fmt = v => (Math.round(v*100)/100).toFixed(2).replace(".", ",") + " €";
 
-// ✅ Produits — modifie cette liste ou charge ton JSON hébergé
+/* =====================
+   1) Données produits
+   ===================== */
+/* ⚠️ Option A (simple) : produits en dur */
 const PRODUCTS = [
-  { id: "1", name: "T-shirt noir", price: 15.99, description: "T-shirt 100% coton, S à XL.", image: "https://picsum.photos/seed/tshirt/600/400" },
-  { id: "2", name: "Casquette bleue", price: 9.99, description: "Casquette unisexe marine.", image: "https://picsum.photos/seed/cap/600/400" }
+  { id:"1", name:"T-shirt noir", price:15.99, description:"T-shirt 100% coton, S à XL.", image:"https://picsum.photos/seed/tshirt/600/400" },
+  { id:"2", name:"Casquette bleue", price:9.99, description:"Casquette unisexe marine.", image:"https://picsum.photos/seed/cap/600/400" }
 ];
 
-// Panier simple {id, name, price, qty}
-const cart = [];
-const fmt = v => v.toFixed(2).replace(".", ",") + " €";
+/* // Option B (dyn) : décommente pour charger un products.json hébergé
+async function loadProducts() {
+  const res = await fetch('products.json', { cache: 'no-store' });
+  if (!res.ok) throw new Error('Produits introuvables');
+  return await res.json();
+}
+*/
 
-function addToCart(p) {
-  const found = cart.find(i => i.id === p.id);
-  if (found) found.qty += 1; else cart.push({ id: p.id, name: p.name, price: p.price, qty: 1 });
-  renderSummary();
-  if (tg) tg.HapticFeedback.impactOccurred("light");
+/* =====================
+   2) Panier (state + persist)
+   ===================== */
+const LS_KEY = "tgshop_cart_v1";
+let cart = [];
+
+function loadCart() {
+  try { cart = JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
+  catch { cart = []; }
+}
+function saveCart() {
+  localStorage.setItem(LS_KEY, JSON.stringify(cart));
+}
+function cartItems() { return cart.reduce((s,i)=>s+i.qty,0); }
+function cartTotal() { return cart.reduce((s,i)=>s+i.price*i.qty,0); }
+function findInCart(id){ return cart.find(i=>i.id===id); }
+
+function addToCart(p, q=1) {
+  const it = findInCart(p.id);
+  if (it) it.qty += q; else cart.push({ id:p.id, name:p.name, price:p.price, image:p.image, qty:q });
+  saveCart(); renderSummary(); renderCart(); tg?.HapticFeedback?.impactOccurred("light");
+}
+function changeQty(id, delta) {
+  const it = findInCart(id);
+  if (!it) return;
+  it.qty += delta;
+  if (it.qty <= 0) cart = cart.filter(x=>x.id!==id);
+  saveCart(); renderSummary(); renderCart();
+}
+function removeItem(id) {
+  cart = cart.filter(x=>x.id!==id);
+  saveCart(); renderSummary(); renderCart();
+}
+function clearCartAll() {
+  cart = []; saveCart(); renderSummary(); renderCart();
 }
 
+/* =====================
+   3) Rendu UI
+   ===================== */
 function renderProducts() {
-  const root = document.getElementById("products");
-  root.innerHTML = "";
-  PRODUCTS.forEach(p => {
-    const card = document.createElement("div");
-    card.className = "card";
+  const root = document.getElementById("products"); root.innerHTML = "";
+  PRODUCTS.forEach(p=>{
+    const card = document.createElement("div"); card.className="card";
     card.innerHTML = `
       <img src="${p.image}" alt="${p.name}">
       <div class="body">
@@ -98,50 +164,102 @@ function renderProducts() {
         <div class="price">${fmt(p.price)}</div>
         <div class="desc">${p.description}</div>
         <div class="row">
-          <button class="btn" data-id="${p.id}">➕ Ajouter</button>
+          <button data-id="${p.id}">➕ Ajouter</button>
         </div>
       </div>`;
     root.appendChild(card);
   });
-  root.querySelectorAll("button[data-id]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const p = PRODUCTS.find(x => x.id === btn.dataset.id);
-      addToCart(p);
+  root.querySelectorAll("button[data-id]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const p = PRODUCTS.find(x=>x.id===btn.dataset.id);
+      addToCart(p, 1);
     });
   });
 }
 
 function renderSummary() {
-  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const items = cart.reduce((s, i) => s + i.qty, 0);
-  document.getElementById("summary").textContent = `🧺 Panier (${items}) — ${fmt(total)}`;
+  document.getElementById("summary").textContent = `🧺 Panier (${cartItems()}) — ${fmt(cartTotal())}`;
+  // dans le tiroir
+  document.getElementById("sumItems").textContent = cartItems();
+  document.getElementById("sumTotal").textContent = fmt(cartTotal());
+  // disable checkout si vide
+  const has = cart.length>0;
+  document.getElementById("pay").disabled = !has;
+  document.getElementById("goCheckout").disabled = !has;
+  document.getElementById("clearCart").disabled = !has;
 }
 
-document.getElementById("pay").addEventListener("click", () => {
-  if (!tg) { alert("Cette WebApp doit être ouverte depuis Telegram."); return; }
+function cartItemRow(i){
+  const row = document.createElement("div");
+  row.className="cart-item";
+  row.innerHTML = `
+    <img src="${i.image}" alt="${i.name}">
+    <div>
+      <div class="t">${i.name}</div>
+      <div class="p">${fmt(i.price)} • Sous-total: ${fmt(i.price*i.qty)}</div>
+      <div class="qty" style="margin-top:6px;">
+        <button data-act="dec">−</button>
+        <div>${i.qty}</div>
+        <button data-act="inc">+</button>
+      </div>
+    </div>
+    <div class="row" style="align-self:start;">
+      <button class="del" data-act="del">🗑️</button>
+    </div>`;
+  row.querySelector('[data-act="inc"]').onclick = ()=>changeQty(i.id, +1);
+  row.querySelector('[data-act="dec"]').onclick = ()=>changeQty(i.id, -1);
+  row.querySelector('[data-act="del"]').onclick = ()=>removeItem(i.id);
+  return row;
+}
+function renderCart(){
+  const box = document.getElementById("cartItems"); box.innerHTML = "";
+  if (cart.length===0) {
+    const p = document.createElement("p");
+    p.className="muted"; p.textContent = "Votre panier est vide.";
+    box.appendChild(p); return;
+  }
+  cart.forEach(i => box.appendChild(cartItemRow(i)));
+}
 
+/* =====================
+   4) Tiroir / interactions
+   ===================== */
+const drawer = document.getElementById("drawer");
+document.getElementById("openCart").onclick = ()=>{ drawer.classList.add("open"); drawer.setAttribute("aria-hidden","false"); };
+document.getElementById("closeCart").onclick = ()=>{ drawer.classList.remove("open"); drawer.setAttribute("aria-hidden","true"); };
+document.getElementById("clearCart").onclick = ()=>{ if (confirm("Vider le panier ?")) clearCartAll(); };
+document.getElementById("goCheckout").onclick = ()=>document.getElementById("pay").click();
+
+/* =====================
+   5) Envoi de commande vers le bot
+   ===================== */
+function gatherOrder() {
   const name = document.getElementById("name").value.trim();
   const address = document.getElementById("address").value.trim();
   const phone = document.getElementById("phone").value.trim();
-
-  if (!name || !address || !phone) { alert("Veuillez remplir nom, adresse, téléphone."); return; }
-  if (cart.length === 0) { alert("Votre panier est vide."); return; }
-
-  const payload = {
+  if (!name || !address || !phone) { alert("Veuillez renseigner nom, adresse et téléphone."); return null; }
+  if (cart.length===0) { alert("Votre panier est vide."); return null; }
+  return {
     kind: "order",
     customer_name: name,
-    address,
-    phone,
-    cart,
-    total: cart.reduce((s, i) => s + i.price * i.qty, 0)
+    address, phone,
+    cart: cart.map(i=>({ id:i.id, name:i.name, price:i.price, qty:i.qty })),
+    total: cartTotal()
   };
-
-  // Envoi au bot
-  tg.sendData(JSON.stringify(payload));
-  tg.close(); // ferme la WebApp
+}
+document.getElementById("pay").addEventListener("click", ()=>{
+  const order = gatherOrder(); if (!order) return;
+  if (!tg) { alert("Ouvrez cette page depuis Telegram."); return; }
+  tg.sendData(JSON.stringify(order));
+  tg.close();
 });
 
+/* =====================
+   6) Boot
+   ===================== */
+loadCart();
 renderProducts();
+renderCart();
 renderSummary();
 </script>
 </body>
