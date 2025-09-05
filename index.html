@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Boutique Telegram</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { --pad: 14px; --radius: 14px; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: #0f0f10; color: #fff;
+    }
+    .wrap { padding: var(--pad); max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 20px; margin: 0 0 10px; }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
+      gap: var(--pad);
+    }
+    .card {
+      background: #18181a; border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 0 0 1px #26262a inset;
+    }
+    .card img { width: 100%; aspect-ratio: 3/2; object-fit: cover; }
+    .card .body { padding: var(--pad); display: flex; flex-direction: column; gap: 8px; }
+    .name { font-weight: 600; }
+    .price { opacity: .9; }
+    .desc { opacity: .8; font-size: 14px; line-height: 1.35; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    button, .btn {
+      background: #2b2b30; color: #fff; border: 0; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+    }
+    .cta { background: #4caf50; }
+    .bar {
+      position: sticky; bottom: 0; left:0; right:0; padding: var(--pad);
+      background: #121214cc; backdrop-filter: blur(6px);
+      display: flex; gap: 8px; align-items: center; justify-content: space-between;
+      border-top: 1px solid #26262a;
+    }
+    input, textarea {
+      width: 100%; background: #1b1b1f; color: #fff; border: 1px solid #2a2a2f; border-radius: 10px; padding: 10px;
+    }
+    form { display: grid; gap: 10px; margin-top: 8px; }
+    .muted { opacity: .7; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🛍️ Boutique</h1>
+    <p class="muted">Ajoute des articles au panier puis valide ta commande.</p>
+
+    <div id="products" class="grid"></div>
+
+    <h2 style="margin-top:18px;">🧾 Livraison</h2>
+    <form id="checkout">
+      <input id="name" placeholder="Nom complet" required />
+      <textarea id="address" placeholder="Adresse de livraison" rows="3" required></textarea>
+      <input id="phone" placeholder="Téléphone" required />
+    </form>
+  </div>
+
+  <div class="bar">
+    <div id="summary">🧺 Panier (0) — 0,00 €</div>
+    <button id="pay" class="cta">Envoyer la commande</button>
+  </div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+tg?.expand(); // agrandir la WebApp
+
+// ✅ Produits — modifie cette liste ou charge ton JSON hébergé
+const PRODUCTS = [
+  { id: "1", name: "T-shirt noir", price: 15.99, description: "T-shirt 100% coton, S à XL.", image: "https://picsum.photos/seed/tshirt/600/400" },
+  { id: "2", name: "Casquette bleue", price: 9.99, description: "Casquette unisexe marine.", image: "https://picsum.photos/seed/cap/600/400" }
+];
+
+// Panier simple {id, name, price, qty}
+const cart = [];
+const fmt = v => v.toFixed(2).replace(".", ",") + " €";
+
+function addToCart(p) {
+  const found = cart.find(i => i.id === p.id);
+  if (found) found.qty += 1; else cart.push({ id: p.id, name: p.name, price: p.price, qty: 1 });
+  renderSummary();
+  if (tg) tg.HapticFeedback.impactOccurred("light");
+}
+
+function renderProducts() {
+  const root = document.getElementById("products");
+  root.innerHTML = "";
+  PRODUCTS.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img src="${p.image}" alt="${p.name}">
+      <div class="body">
+        <div class="name">${p.name}</div>
+        <div class="price">${fmt(p.price)}</div>
+        <div class="desc">${p.description}</div>
+        <div class="row">
+          <button class="btn" data-id="${p.id}">➕ Ajouter</button>
+        </div>
+      </div>`;
+    root.appendChild(card);
+  });
+  root.querySelectorAll("button[data-id]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const p = PRODUCTS.find(x => x.id === btn.dataset.id);
+      addToCart(p);
+    });
+  });
+}
+
+function renderSummary() {
+  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const items = cart.reduce((s, i) => s + i.qty, 0);
+  document.getElementById("summary").textContent = `🧺 Panier (${items}) — ${fmt(total)}`;
+}
+
+document.getElementById("pay").addEventListener("click", () => {
+  if (!tg) { alert("Cette WebApp doit être ouverte depuis Telegram."); return; }
+
+  const name = document.getElementById("name").value.trim();
+  const address = document.getElementById("address").value.trim();
+  const phone = document.getElementById("phone").value.trim();
+
+  if (!name || !address || !phone) { alert("Veuillez remplir nom, adresse, téléphone."); return; }
+  if (cart.length === 0) { alert("Votre panier est vide."); return; }
+
+  const payload = {
+    kind: "order",
+    customer_name: name,
+    address,
+    phone,
+    cart,
+    total: cart.reduce((s, i) => s + i.price * i.qty, 0)
+  };
+
+  // Envoi au bot
+  tg.sendData(JSON.stringify(payload));
+  tg.close(); // ferme la WebApp
+});
+
+renderProducts();
+renderSummary();
+</script>
+</body>
+</html>
