@@ -1,5 +1,6 @@
 import os
 import json
+import requests
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -8,7 +9,7 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from dotenv import load_dotenv
-import requests
+
 
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
@@ -75,6 +76,7 @@ def load_products() -> List[Dict]:
     with open(PRODUCTS_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
 PRODUCTS: List[Dict] = load_products()
 # ids en str pour uniformiser
 for p in PRODUCTS:
@@ -126,6 +128,10 @@ def add_item_to_cart(context: CallbackContext, product: Dict, variant: Optional[
 def remove_item_from_cart(context: CallbackContext, key: str):
     cart = ensure_cart(context)
     context.user_data["cart"] = [it for it in cart if it.get("key") != key]
+
+def display_label(i: Dict) -> str:
+    v = i.get("variant")
+    return f"{i['name']} ({v})" if v else i["name"]
 
 # =========================
 # Claviers & textes
@@ -377,9 +383,6 @@ def remove_from_cart_cb(update: Update, context: CallbackContext):
     send_cart(update, context, query_msg=query.message)
     query.answer("Retiré ✅")
 
-def display_label(i: Dict) -> str:
-    v = i.get("variant")
-    return f"{i['name']} ({v})" if v else i["name"]
 
 
 # =========================
