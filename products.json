@@ -1,16 +1,17 @@
 [
     {
-      "id": 1,
+      "id": "1",
       "name": "T-shirt noir",
       "price": 15.99,
       "description": "T-shirt 100% coton, S à XL.",
-      "image": "https://picsum.photos/seed/tshirt/600/400"
+      "image": "https://picsum.photos/seed/tshirt/600/400",
+      "variants": ["S", "M", "L", "XL"]
     },
     {
-      "id": 2,
+      "id": "2",
       "name": "Casquette bleue",
       "price": 9.99,
-      "description": "Casquette unisexe bleu marine.",
+      "description": "Casquette unisexe marine.",
       "image": "https://picsum.photos/seed/cap/600/400"
     }
   ]
