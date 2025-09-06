@@ -377,6 +377,11 @@ def remove_from_cart_cb(update: Update, context: CallbackContext):
     send_cart(update, context, query_msg=query.message)
     query.answer("Retiré ✅")
 
+def display_label(i: Dict) -> str:
+    v = i.get("variant")
+    return f"{i['name']} ({v})" if v else i["name"]
+
+
 # =========================
 # Checkout (Conversation)
 # =========================
@@ -463,10 +468,8 @@ def confirm_or_cancel(update: Update, context: CallbackContext):
         cart = ensure_cart(context)
 
         # Construire le texte items avant de vider
-        items_txt = ", ".join(
-            f"{i['name']}{f' ({i['variant']})' if i.get('variant') else ''} x{i['qty']}"
-            for i in cart
-        )
+        items_txt = ", ".join(f"{display_label(i)} x{i['qty']}" for i in cart)
+
 
         order["cart"] = cart
         order["total"] = round(get_cart_total(cart), 2)
@@ -550,10 +553,8 @@ def handle_webapp_data(update: Update, context: CallbackContext):
         # Notif admin éventuelle
         if ADMIN_CHAT_ID:
             try:
-                items = ", ".join(
-                    f"{i['name']}{f' ({i['variant']})' if i.get('variant') else ''} x{i['qty']}"
-                    for i in order.get("cart", [])
-                )
+                items = ", ".join(f"{display_label(i)} x{i['qty']}" for i in order.get("cart", []))
+
                 text_admin = (
                     "📦 *Nouvelle commande (WebApp)*\n"
                     f"Client: {order.get('customer_name')} ({order.get('username')})\n"
